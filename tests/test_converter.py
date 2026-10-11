@@ -47,6 +47,9 @@ def test_unmapped_allele_is_flagged():
 def test_unparseable():
     assert to_serologic("garbage", REF).status == "unparseable"
 
+def test_dr9_dr10():
+    assert to_serologic("DRB1*09:01", REF).serologic_split == "DR9"
+    assert to_serologic("DRB1*10:01", REF).serologic_split == "DR10"
 
 def _run_all():
     tests = [v for k, v in globals().items() if k.startswith("test_") and callable(v)]
