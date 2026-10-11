@@ -145,5 +145,21 @@ packaging/     Windows exe entry point, weekly watch script
 tests/         offline tests (fixtures + fake GitHub) and an optional live test
 ```
 
-Data: IPD-IMGT/HLA Database, https://www.ebi.ac.uk/ipd/imgt/hla/ — please cite
-Barker DJ et al., *Nucleic Acids Research* (2023) and the WMDA files' README.
+## Licence
+
+- **hla-sero code:** [MIT](LICENSE) — free to use, modify and share; provided "as is", without warranty.
+- **IMGT/HLA data:** not included in this repository. hla-sero downloads the unmodified WMDA
+  files from the official [ANHIG/IMGTHLA](https://github.com/ANHIG/IMGTHLA) repository, which are
+  © IPD-IMGT/HLA under the Creative Commons Attribution-NoDerivs licence
+  ([LICENCE.md](https://github.com/ANHIG/IMGTHLA/blob/Latest/LICENCE.md)). Distributing a
+  *modified* version of that data needs permission from the IPD team. The test fixtures in
+  `tests/conftest.py` are synthetic and are not IMGT/HLA data.
+
+When you use results from hla-sero, please cite the IPD-IMGT/HLA Database:
+
+- Barker DJ, Natarajan RHL, Cooper MA, Hopper SJF, Yates AD, Parham P, Marsh SGE, Robinson J.
+  The IPD-IMGT/HLA Database: recent developments in sequence submission.
+  *Nucleic Acids Research* (2026) 54(D1): D1152–D1158
+- Robinson J, Barker D, Marsh SGE. 25 years of the IPD-IMGT/HLA Database. *HLA* (2024) 103(6): e15549
+
+IPD-IMGT/HLA asks commercial users of its data to consider funding the database (see its LICENCE.md).

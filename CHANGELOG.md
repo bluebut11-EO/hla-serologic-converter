@@ -1,5 +1,8 @@
 # Changelog
 
+## Unreleased
+- MIT licence for the code; README explains the separate IPD-IMGT/HLA data licence (CC BY-ND) and citations.
+
 ## 0.4.0
 - **Fix:** allele fields with four digits (A*02:1000+, C*07:1000+, DPB1*1000+; 1,595 alleles
   in IPD-IMGT/HLA 3.65.0) are now read correctly. Earlier versions could read `A*02:1294`
