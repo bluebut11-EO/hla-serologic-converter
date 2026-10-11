@@ -1,0 +1,79 @@
+# Weekly watch on the official IPD-IMGT/HLA data (github.com/ANHIG/IMGTHLA).
+#
+#  * new IMGT/HLA release  -> opens ONE issue for it with a report of every 2-field
+#                             allele whose serological equivalent or status changed
+#                             (GitHub emails you about new issues in your repository)
+#  * hla-sero checks fail  -> the issue title says FAILED and the run fails
+#                             (GitHub also emails you about the failed workflow run)
+#  * nothing new           -> nothing happens, no email
+#
+# Run it any time from the Actions tab -> "IMGT/HLA watch" -> "Run workflow".
+name: IMGT/HLA watch
+
+on:
+  schedule:
+    - cron: "23 13 * * 1"     # Mondays 13:23 UTC (9:23 New York, summer time)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  actions: write              # keepalive step below
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[dev]"
+
+      - name: hla-sero checks against the latest release
+        id: live
+        continue-on-error: true
+        shell: bash               # bash -eo pipefail: a test failure must not be hidden by tee
+        env:
+          HLA_SERO_LIVE: "1"
+        run: python -m pytest -q tests/ 2>&1 | tee live.txt
+
+      - name: Compare with the previous release
+        id: report
+        run: >
+          python packaging/imgt_watch.py --out report.md
+          --tests live.txt --tests-outcome "${{ steps.live.outcome }}"
+
+      - name: Open an issue for a release not reported yet
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.report.outputs.version }}
+          CHANGED: ${{ steps.report.outputs.changed }}
+          OUTCOME: ${{ steps.live.outcome }}
+        run: |
+          if [ "$OUTCOME" = "success" ]; then
+            title="IMGT/HLA $VERSION released: $CHANGED serology change(s) to review"
+          else
+            title="⚠️ IMGT/HLA $VERSION: hla-sero checks FAILED"
+          fi
+          if gh issue list --state all --limit 500 --json title --jq '.[].title' | grep -Fxq "$title"; then
+            echo "Already reported: $title"
+          else
+            gh issue create --title "$title" --body-file report.md
+            echo "Opened issue: $title"
+          fi
+
+      - name: Keep the weekly schedule alive
+        # GitHub turns off scheduled workflows in public repositories after 60 days
+        # without repository activity; re-enabling it here each week prevents that.
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow enable imgt-watch.yml
+
+      - name: Fail the run if hla-sero checks failed
+        if: steps.live.outcome != 'success'
+        run: |
+          echo "hla-sero checks failed against the latest IMGT/HLA release - see the issue."
+          exit 1

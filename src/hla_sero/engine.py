@@ -28,19 +28,19 @@ from dataclasses import asdict, dataclass
 
 from .wmda import SEROLOGY_PREFIX, AlleleRecord, Database
 
-# A field is digits (01, 101) or a letter code (XX, or an NMDP MAC like AB).
-# Kept apart from the trailing one-letter suffix so "01:01:01G" parses as
-# fields 01:01:01 + suffix G rather than a field "01G".
-_FIELD = r"(?:\d{1,3}|[A-Z]{2,5})"
-_ALLELE = rf"\d{{1,3}}(?::{_FIELD})*[A-Z]?"
+# A field is digits (01, 101, 1294 — numbers passed 999 in large families such as
+# A*02 and C*07, and DPB1 first fields passed 999) or a letter code (XX, or an NMDP
+# MAC like AB). The suffix is kept apart so "01:01:01G" is fields 01:01:01 + G.
+_FIELD = r"(?:\d{1,4}|[A-Z]{2,5})"
 _LOCUS = r"[A-Z]{1,4}\d?"
 
-# Allele-like tokens inside arbitrary pasted text (with optional /alternatives)
-TOKEN_RE = re.compile(rf"(?:HLA-)?{_LOCUS}\*{_ALLELE}(?:/(?:{_LOCUS}\*)?{_ALLELE})*")
+# Extraction is deliberately loose: grab the WHOLE allele-like word, then validate it
+# with _NAME_RE. A malformed name becomes a visible "unparseable" row instead of being
+# silently cut short into a different allele (A*02:12945 must never become A*02:1294).
+TOKEN_RE = re.compile(rf"(?<![A-Za-z0-9])(?:HLA-)?{_LOCUS}\*[0-9A-Z]+(?:[:/*][0-9A-Z]+)*")
 _NAME_RE = re.compile(
-    rf"^(?:HLA-)?(?P<locus>{_LOCUS})\*(?P<body>\d{{1,3}}(?::{_FIELD})*)(?P<suffix>[A-Z])?$"
+    rf"^(?:HLA-)?(?P<locus>{_LOCUS})\*(?P<body>\d{{1,4}}(?::{_FIELD})*)(?P<suffix>[A-Z])?$"
 )
-# A bare locus heading like "HLA-A:" or "DRB1" is not a sample name ("S1" is)
 _LOCUS_LABEL_RE = re.compile(r"(?:HLA-)?(?:A|B|C|DRB[1-9]|DQ[AB][12]|DP[AB][12]|MIC[AB])", re.I)
 
 STATUS_ORDER = ["mapped", "assumed", "ambiguous", "null", "no-equivalent",

@@ -113,7 +113,9 @@ def load(folder: str | Path) -> Database:
         rec = AlleleRecord(locus, *parts[1:7])
         db.alleles[(locus, rec.name)] = rec
         f = rec.fields
-        for n in range(1, len(f)):            # index by 1-, 2- and 3-field prefixes
+        # index by every prefix incl. the full name without its suffix,
+        # so "A*01:22" finds the 2-field-only allele A*01:22N
+        for n in range(1, len(f) + 1):
             db.by_prefix.setdefault((locus, ":".join(f[:n])), []).append(rec)
 
     for line in _data_lines(folder / "rel_ser_ser.txt"):

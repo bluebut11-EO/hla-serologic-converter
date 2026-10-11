@@ -50,6 +50,7 @@ Step-by-step guide in Korean: [`docs/SETUP_LINUX_MINT_KO.md`](docs/SETUP_LINUX_M
 | `hla-sero update` | check for a new release now |
 | `hla-sero config --pin 3.64.0` / `--unpin` | lock to a validated release / follow latest |
 | `hla-sero config --auto-update notify` | `auto` (default), `notify`, or `off` |
+| `hla-sero diff 3.64.0 3.65.0` | what changed between two releases |
 
 ## Cross-check against your current serology
 
@@ -98,6 +99,20 @@ allele,equivalent,associated,broad,note
 A*02:03,A203,,A2,UNOS listing
 ```
 
+## Release watch and email alerts
+
+`.github/workflows/imgt-watch.yml` checks IPD-IMGT/HLA every Monday. When a new
+release appears it opens one issue listing every 2-field group whose serological
+equivalent or status changed since the previous release, and whether hla-sero's
+checks pass against it — GitHub emails you about the issue. The same comparison
+locally:
+
+```bash
+hla-sero diff 3.64.0 3.65.0            # or -o changes.md for a Markdown report
+```
+
+Setup and what to do when an alert arrives (Korean): [`docs/EMAIL_ALERTS_KO.md`](docs/EMAIL_ALERTS_KO.md)
+
 ## Building the Windows program
 
 `.github/workflows/build.yml` runs the tests on Linux and Windows (plus a live check
@@ -121,11 +136,12 @@ src/hla_sero/
   wmda.py      parse the WMDA files
   engine.py    allele -> serology rules, text extraction
   crosscheck.py  compare with the lab's existing serology
+  diff.py      release-to-release changes
   imgt.py      download, checksum, cache, update policy
   cli.py       hla-sero command
   gui.py       local copy-paste server (127.0.0.1 only)
   web/index.html
-packaging/     entry point for the Windows exe
+packaging/     Windows exe entry point, weekly watch script
 tests/         offline tests (fixtures + fake GitHub) and an optional live test
 ```
 

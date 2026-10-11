@@ -10,6 +10,7 @@ hla-sero — molecular HLA typing -> serological equivalents (IPD-IMGT/HLA WMDA 
   hla-sero config --auto-update auto|notify|off   [--pin 3.65.0 | --unpin]
   hla-sero install-launcher        add "HLA Serology Converter" to the Mint menu
   hla-sero demo                    print synthetic typing to try things out
+  hla-sero diff 3.64.0 3.65.0      what changed between two IMGT/HLA releases
 
 Cross-check: put your lab's serology after each allele (A*02:01 A2  B*15:03 B72)
 and every row is marked match / broad-match / mismatch.
@@ -168,6 +169,24 @@ def cmd_install_launcher(_args) -> int:
     return 0
 
 
+def cmd_diff(args) -> int:
+    from . import wmda
+    from .diff import release_diff, render_markdown, render_text
+
+    def get(version):
+        if version not in imgt.installed_releases():
+            imgt.download_release(imgt.release_to_ref(version), log=_err)
+        return wmda.load(imgt.releases_dir() / version)
+
+    d = release_diff(get(args.old), get(args.new))
+    if args.output:
+        Path(args.output).write_text(render_markdown(d), encoding="utf-8")
+        _err(f"{len(d.changed)} changed, {len(d.new_groups)} new, {len(d.removed)} removed -> {args.output}")
+    else:
+        print(render_text(d))
+    return 0
+
+
 def cmd_demo(args) -> int:
     from .synthetic import demo_text
     print(demo_text(args.num))
@@ -212,6 +231,12 @@ def build_parser() -> argparse.ArgumentParser:
     g.set_defaults(func=cmd_gui)
 
     sub.add_parser("install-launcher", help="add a menu entry").set_defaults(func=cmd_install_launcher)
+
+    df = sub.add_parser("diff", help="compare serology between two IMGT/HLA releases")
+    df.add_argument("old", help="e.g. 3.64.0")
+    df.add_argument("new", help="e.g. 3.65.0")
+    df.add_argument("-o", "--output", help="write a Markdown report")
+    df.set_defaults(func=cmd_diff)
 
     d = sub.add_parser("demo", help="print synthetic typing (no real data)")
     d.add_argument("-n", "--num", type=int, default=5)

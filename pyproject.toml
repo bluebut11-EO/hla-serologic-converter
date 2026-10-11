@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hla-serologic-converter"
-version = "0.3.0"
+version = "0.4.0"
 description = "Molecular HLA typing -> serological equivalents, using live IPD-IMGT/HLA WMDA data"
 readme = "README.md"
 requires-python = ">=3.9"
