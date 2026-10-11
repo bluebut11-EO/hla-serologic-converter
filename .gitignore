@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+.env
+.DS_Store
+.ipynb_checkpoints/
+# never commit real or potentially-identifiable data
+data/synthetic/*_converted.csv
+*.real.csv

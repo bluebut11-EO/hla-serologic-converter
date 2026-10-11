@@ -1,0 +1,50 @@
+# Illustrative HLA molecular -> serologic equivalent table (SUBSET, NOT COMPLETE).
+# Keyed by locus + first-field allele family. This is a teaching scaffold only.
+# For real use, replace with the authoritative IMGT/HLA `rel_dna_ser.txt` mapping,
+# which assigns serology at the ALLELE level (some alleles in a family differ).
+# Columns: locus,family,serologic_split,serologic_broad
+locus,family,serologic_split,serologic_broad
+A,01,A1,A1
+A,02,A2,A2
+A,03,A3,A3
+A,11,A11,A11
+A,23,A23,A9
+A,24,A24,A9
+A,25,A25,A10
+A,26,A26,A10
+A,29,A29,A19
+A,30,A30,A19
+A,31,A31,A19
+A,32,A32,A19
+A,33,A33,A19
+A,68,A68,A28
+A,69,A69,A28
+B,07,B7,B7
+B,08,B8,B8
+B,13,B13,B13
+B,27,B27,B27
+B,35,B35,B35
+B,44,B44,B12
+B,45,B45,B12
+B,51,B51,B5
+B,52,B52,B5
+B,57,B57,B17
+B,58,B58,B17
+C,01,Cw1,Cw1
+C,02,Cw2,Cw2
+C,03,Cw9,Cw3
+C,04,Cw4,Cw4
+C,05,Cw5,Cw5
+C,06,Cw6,Cw6
+C,07,Cw7,Cw7
+DRB1,01,DR1,DR1
+DRB1,03,DR17,DR3
+DRB1,04,DR4,DR4
+DRB1,07,DR7,DR7
+DRB1,08,DR8,DR8
+DRB1,11,DR11,DR5
+DRB1,12,DR12,DR5
+DRB1,13,DR13,DR6
+DRB1,14,DR14,DR6
+DRB1,15,DR15,DR2
+DRB1,16,DR16,DR2
