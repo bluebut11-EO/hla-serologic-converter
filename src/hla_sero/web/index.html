@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HLA Serology Converter</title>
+<style>
+:root {
+  --bg: #f6f7f5; --panel: #ffffff; --ink: #1d2320; --muted: #5d6762; --line: #dde2de;
+  --accent: #1f6f5c; --accent-ink: #ffffff; --accent-soft: #e3f0eb;
+  --ok: #1f6f5c; --ok-bg: #e3f0eb; --warn: #8a5a00; --warn-bg: #fbefd6;
+  --bad: #9b2c2c; --bad-bg: #f8e1e1; --info: #3b4a8a; --info-bg: #e5e8f6; --grey-bg: #eceeed;
+  --mono: ui-monospace, "DejaVu Sans Mono", "Liberation Mono", Menlo, monospace;
+  --sans: system-ui, "Ubuntu", "Noto Sans", "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #131715; --panel: #1b201e; --ink: #e6ebe8; --muted: #9aa49f; --line: #2c3431;
+    --accent: #5fb89d; --accent-ink: #0f1412; --accent-soft: #1f3a32;
+    --ok: #7fd1b5; --ok-bg: #1d3830; --warn: #f0c46c; --warn-bg: #3a2f17;
+    --bad: #f1a3a3; --bad-bg: #3d2020; --info: #aab6f2; --info-bg: #242a46; --grey-bg: #262c2a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.45 var(--sans); }
+header {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel);
+}
+h1 { font-size: 17px; margin: 0; letter-spacing: .2px; }
+h1 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
+.db { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; color: var(--muted); }
+.chip { display: inline-block; padding: 2px 9px; border-radius: 999px; background: var(--accent-soft);
+  color: var(--accent); font-weight: 600; font-size: 12.5px; white-space: nowrap; }
+main { max-width: 1280px; margin: 0 auto; padding: 18px 20px 40px; display: grid; gap: 18px;
+  grid-template-columns: minmax(0, 1fr); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; min-width: 0; }
+button.primary .counts { color: inherit; opacity: .8; }
+label.h { display: block; font-weight: 600; margin-bottom: 6px; }
+.hint { color: var(--muted); font-size: 13px; margin: 0 0 8px; }
+textarea {
+  width: 100%; min-height: 170px; resize: vertical; padding: 10px 12px; border-radius: 8px;
+  border: 1px solid var(--line); background: var(--bg); color: var(--ink); font: 14px/1.5 var(--mono);
+}
+textarea:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+button {
+  font: inherit; font-size: 14px; padding: 7px 14px; border-radius: 7px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+}
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+button:disabled { opacity: .55; cursor: default; }
+.spacer { flex: 1; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: -4px 0 12px; }
+.tabs button { border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 8px 12px; color: var(--muted); }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
+.table-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+td.mono { font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+td.eq { font-weight: 700; white-space: nowrap; }
+td.note { color: var(--muted); font-size: 13px; min-width: 220px; }
+.assoc { max-width: 220px; overflow-wrap: anywhere; font-family: var(--mono); font-size: 12.5px; }
+.st { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.st.mapped { background: var(--ok-bg); color: var(--ok); }
+.st.assumed, .st.ambiguous { background: var(--warn-bg); color: var(--warn); }
+.st.null { background: var(--info-bg); color: var(--info); }
+.st.not-found, .st.unparseable, .st.unsupported { background: var(--bad-bg); color: var(--bad); }
+.st.no-equivalent { background: var(--grey-bg); color: var(--muted); }
+.summary-antigens { font-family: var(--mono); font-size: 14px; }
+.flag { color: var(--warn); font-weight: 700; }
+.counts { color: var(--muted); font-size: 13px; }
+.empty { color: var(--muted); padding: 18px 4px; }
+.err { background: var(--bad-bg); color: var(--bad); padding: 10px 12px; border-radius: 8px; margin-bottom: 10px; }
+.toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--bg);
+  padding: 8px 16px; border-radius: 8px; font-size: 14px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.toast.show { opacity: 1; }
+footer { color: var(--muted); font-size: 12.5px; text-align: center; padding: 0 20px 24px; }
+details { font-size: 13px; color: var(--muted); }
+details ul { margin: 6px 0 0; padding-left: 18px; }
+@media (max-width: 640px) {
+  header { padding: 12px 16px; } main { padding: 14px 16px 32px; }
+  td.note { min-width: 160px; }
+  button.primary .counts { display: none; }
+  textarea { white-space: pre; overflow-x: auto; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>HLA Serology Converter <small id="appver"></small></h1>
+  <div class="db">
+    <span id="dbchip" class="chip">loading…</span>
+    <span id="dbmeta"></span>
+    <button id="updateBtn" type="button" title="Check GitHub for a newer IPD-IMGT/HLA release">Check for update</button>
+    <button id="quitBtn" type="button" title="Stop the converter">Quit</button>
+  </div>
+</header>
+
+<main>
+  <section class="panel">
+    <div id="err" class="err" hidden></div>
+    <label class="h" for="input">Paste molecular typing</label>
+    <p class="hint">Any layout works: a block copied from Excel, a report line, or a list.
+      Two-field, full alleles, G/P groups, XX codes and ambiguity strings (B*15:01/15:03) are understood.</p>
+    <textarea id="input" spellcheck="false" placeholder="SYN0001	A*02:01	A*24:02	B*15:01	B*44:02	C*03:04	C*07:01	DRB1*03:01	DRB1*15:01
+Patient 2: A*01:01:01G, A*02:03, B*15:03, B*51:01, DRB1*04:01, DQB1*03:01"></textarea>
+    <div class="row">
+      <button id="convertBtn" class="primary" type="button">Convert <span class="counts">(Ctrl+Enter)</span></button>
+      <button id="exampleBtn" type="button">Load example</button>
+      <button id="clearBtn" type="button">Clear</button>
+      <span class="spacer"></span>
+      <span id="counts" class="counts"></span>
+    </div>
+  </section>
+
+  <section class="panel" id="results" hidden>
+    <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="true" data-view="summary">By sample</button>
+      <button role="tab" aria-selected="false" data-view="detail">Allele detail</button>
+      <span class="spacer"></span>
+    </div>
+    <div class="row" style="margin: 0 0 10px">
+      <button id="copySummary" type="button">Copy antigens</button>
+      <button id="copyTable" type="button">Copy table for Excel</button>
+      <button id="downloadCsv" type="button">Download CSV</button>
+      <span class="spacer"></span>
+      <span id="prov" class="counts"></span>
+    </div>
+    <div id="summaryView" class="table-wrap"></div>
+    <div id="detailView" class="table-wrap" hidden></div>
+    <details style="margin-top:12px">
+      <summary>What the statuses mean</summary>
+      <ul>
+        <li><span class="st mapped">mapped</span> serologically characterised (WMDA unambiguous or possible)</li>
+        <li><span class="st assumed">assumed</span> no characterised serology; WMDA value assumed from the allele name — verify</li>
+        <li><span class="st ambiguous">ambiguous</span> the alleles covered by this typing map to different antigens</li>
+        <li><span class="st null">null</span> not expressed (N allele)</li>
+        <li><span class="st no-equivalent">no-equivalent</span> WMDA lists no serological antigen</li>
+        <li><span class="st not-found">not-found</span> / <span class="st unsupported">unsupported</span> not in this IMGT/HLA release, or an NMDP MAC code</li>
+      </ul>
+    </details>
+  </section>
+</main>
+<footer>Runs on this computer only — pasted typing never leaves it. Data: IPD-IMGT/HLA WMDA files
+  (github.com/ANHIG/IMGTHLA). A tool for checking typing data; results need review before clinical use.</footer>
+<div id="toast" class="toast" role="status"></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let rows = [], provenance = "", view = "summary";
+const FLAG = new Set(["assumed", "ambiguous", "not-found", "unsupported", "unparseable"]);
+
+const EXAMPLE = [
+  "SYN0001\tA*02:01\tA*24:02\tB*15:01\tB*44:02\tC*03:04\tC*07:01\tDRB1*03:01\tDRB1*15:01\tDQB1*02:01\tDQB1*06:02",
+  "SYN0002\tA*01:01:01G\tA*02:03\tB*15:03\tB*51:01\tC*03:03\tC*15:02\tDRB1*04:01\tDRB1*11:01\tDQB1*03:01\tDQB1*03:02",
+  "SYN0003\tA*02:55:01\tA*68:01\tB*15:01/15:03\tB*07:02\tC*07:02\tC*01:02\tDRB1*01:01\tDRB1*13:01\tDRB3*01:01\tDRB4*01:01",
+  "SYN0004\tA*01:01:01:02N\tA*11:01\tB*35:01\tB*57:01\tC*04:01\tC*06:02\tDRB1*07:01\tDRB1*15:01\tDRB5*01:01\tA*02:AB",
+].join("\n");
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function toast(msg) {
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+async function api(path, body) {
+  const opt = body === undefined ? {} : { method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body) };
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+function showStatus(s) {
+  $("appver").textContent = "v" + s.app_version;
+  $("dbchip").textContent = s.release ? "IPD-IMGT/HLA " + s.release : "no data";
+  $("dbmeta").textContent = s.release
+    ? `${s.date} · ${s.alleles.toLocaleString()} alleles · auto-update: ${s.pinned ? "pinned " + s.pinned : s.auto_update}`
+    : "";
+  $("err").hidden = !s.error;
+  $("err").textContent = s.error ? "Data problem: " + s.error + " — check the internet connection, then press Check for update." : "";
+  $("convertBtn").disabled = !s.release;
+}
+
+async function refreshStatus() { showStatus(await api("/api/status")); }
+
+async function convert() {
+  const text = $("input").value;
+  if (!text.trim()) { toast("Paste some typing first"); return; }
+  $("convertBtn").disabled = true;
+  try {
+    const j = await api("/api/convert", { text });
+    rows = j.rows; provenance = j.provenance;
+    render();
+  } catch (e) { toast(e.message); }
+  finally { $("convertBtn").disabled = false; }
+}
+
+// One entry per sample (or per line when there is no sample label)
+function groups() {
+  const out = new Map();
+  for (const r of rows) {
+    const key = r.sample || "line " + r.line;
+    if (!out.has(key)) out.set(key, []);
+    out.get(key).push(r);
+  }
+  return out;
+}
+
+function antigenText(r) {
+  if (r.status === "null") return r.input + "(null)";
+  if (["not-found", "unsupported", "unparseable", "no-equivalent"].includes(r.status)) return "";
+  return r.equivalent + (FLAG.has(r.status) ? "?" : "");
+}
+
+function render() {
+  $("results").hidden = rows.length === 0;
+  const counts = rows.reduce((m, r) => (m[r.status] = (m[r.status] || 0) + 1, m), {});
+  $("counts").textContent = rows.length
+    ? `${rows.length} alleles · ` + Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(" · ")
+    : "No HLA allele names found.";
+  $("prov").textContent = provenance;
+
+  let s = `<table><thead><tr><th>Sample</th><th>Serological equivalents</th><th>Broad</th><th>Check</th></tr></thead><tbody>`;
+  for (const [sample, rs] of groups()) {
+    const flagged = rs.filter((r) => FLAG.has(r.status));
+    const ags = rs.map(antigenText).filter(Boolean).join(" ");
+    const broads = rs.filter((r) => r.broad).map((r) => r.broad).join(" ");
+    s += `<tr><td class="mono">${esc(sample)}</td><td class="summary-antigens">${esc(ags)}</td>
+      <td class="mono">${esc(broads)}</td>
+      <td>${flagged.length ? `<span class="flag">${flagged.length} to review</span>: ` +
+        flagged.map((r) => esc(r.input) + ` <span class="st ${r.status}">${r.status}</span>`).join(", ") : "—"}</td></tr>`;
+  }
+  $("summaryView").innerHTML = s + "</tbody></table>";
+
+  let d = `<table><thead><tr><th>Sample</th><th>Input</th><th>Equivalent</th><th>Broad</th><th>Associated</th>
+    <th>Status</th><th>Basis</th><th>HATS</th><th>Note</th></tr></thead><tbody>`;
+  for (const r of rows) {
+    d += `<tr><td class="mono">${esc(r.sample || "line " + r.line)}</td><td class="mono">${esc(r.input)}</td>
+      <td class="eq">${esc(r.equivalent)}</td><td class="mono">${esc(r.broad)}</td>
+      <td class="assoc">${esc(r.associated)}</td><td><span class="st ${r.status}">${r.status}</span></td>
+      <td class="note">${esc(r.basis)}<br>${esc(r.resolved_as)}</td><td class="mono">${esc(r.hats)}</td>
+      <td class="note">${esc(r.note)}</td></tr>`;
+  }
+  $("detailView").innerHTML = d + "</tbody></table>";
+  setView(view);
+}
+
+function setView(v) {
+  view = v;
+  document.querySelectorAll(".tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === v)));
+  $("summaryView").hidden = v !== "summary";
+  $("detailView").hidden = v !== "detail";
+}
+
+const COLS = ["line","sample","input","equivalent","associated","broad","status","basis","hats","resolved_as","note"];
+function delimited(sep) {
+  const q = (v) => { v = String(v ?? ""); return sep === "," && /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v.replace(/\t/g, " "); };
+  return [COLS.join(sep), ...rows.map((r) => COLS.map((c) => q(r[c])).join(sep))].join("\n");
+}
+
+async function copy(text, what) {
+  try { await navigator.clipboard.writeText(text); toast(what + " copied"); }
+  catch { toast("Copy blocked — select and copy manually"); }
+}
+
+$("convertBtn").onclick = convert;
+$("input").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) convert(); });
+$("exampleBtn").onclick = () => { $("input").value = EXAMPLE; convert(); };
+$("clearBtn").onclick = () => { $("input").value = ""; rows = []; render(); $("input").focus(); };
+document.querySelectorAll(".tabs [role=tab]").forEach((b) => (b.onclick = () => setView(b.dataset.view)));
+$("copyTable").onclick = () => copy(delimited("\t"), "Table");
+$("copySummary").onclick = () => copy([...groups()].map(([s, rs]) => s + "\t" + rs.map(antigenText).filter(Boolean).join(" ")).join("\n"), "Antigens");
+$("downloadCsv").onclick = () => {
+  const blob = new Blob(["# " + provenance + "\n" + delimited(",")], { type: "text/csv" });
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: "hla-serology.csv" });
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$("updateBtn").onclick = async () => {
+  $("updateBtn").disabled = true; $("updateBtn").textContent = "Checking…";
+  try { const s = await api("/api/update", {}); showStatus(s); toast(s.log.at(-1) || "Done"); if (rows.length) convert(); }
+  catch (e) { toast(e.message); }
+  finally { $("updateBtn").disabled = false; $("updateBtn").textContent = "Check for update"; }
+};
+$("quitBtn").onclick = async () => {
+  await api("/api/quit", {}).catch(() => {});
+  document.body.innerHTML = '<main><div class="panel">Converter stopped. You can close this tab.</div></main>';
+};
+
+refreshStatus().catch((e) => toast(e.message));
+$("input").focus();
+</script>
+</body>
+</html>
