@@ -276,8 +276,14 @@ def extract_tokens(text: str) -> list[tuple[int, str, str]]:
 
 
 def convert_text(db: Database, text: str, overrides: dict | None = None) -> list[dict]:
+    """Convert every allele found in the text. If the lab's serology is pasted next
+    to an allele, the row also gets expected / check / check_note (see crosscheck.py)."""
+    from .crosscheck import compare, extract_entries
+
     rows = []
-    for line_no, sample, token in extract_tokens(text):
+    for line_no, sample, token, expected in extract_entries(text):
         r = convert(db, token, overrides).as_dict()
-        rows.append({"line": line_no, "sample": sample, **r})
+        check, check_note = compare(r, expected)
+        rows.append({"line": line_no, "sample": sample, **r,
+                     "expected": expected, "check": check, "check_note": check_note})
     return rows

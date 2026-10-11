@@ -48,6 +48,12 @@ hla-sero convert typing.txt -o out.csv   # CSV로 저장
 hla-sero demo | hla-sero convert         # 합성 예제로 연습
 ```
 
+### 교차 확인 (현재 쓰는 혈청형과 비교)
+
+allele 뒤에 현재 혈청형을 함께 붙여넣으면 줄마다 `match` / `broad-match` / `mismatch`가 표시됩니다.
+엑셀 열(`Sample | Allele | 혈청형`) 그대로 복사해도 되고, `A*02:01 A2  B*15:03 B72`처럼 한 줄로 써도 됩니다.
+자세한 내용과 검증용 양식: `docs/LAB_WINDOWS_KO.md`, `docs/cross_check_template.csv`
+
 ### 결과 상태 읽는 법
 
 | 상태 | 의미 | 할 일 |

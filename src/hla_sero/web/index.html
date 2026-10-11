@@ -68,6 +68,14 @@ td.note { color: var(--muted); font-size: 13px; min-width: 220px; }
 .st.null { background: var(--info-bg); color: var(--info); }
 .st.not-found, .st.unparseable, .st.unsupported { background: var(--bad-bg); color: var(--bad); }
 .st.no-equivalent { background: var(--grey-bg); color: var(--muted); }
+.st.match { background: var(--ok-bg); color: var(--ok); }
+.st.broad-match { background: var(--warn-bg); color: var(--warn); }
+.st.mismatch { background: var(--bad-bg); color: var(--bad); }
+tr.row-mismatch td { background: color-mix(in srgb, var(--bad-bg) 45%, transparent); }
+select { font: inherit; font-size: 13px; padding: 5px 6px; border-radius: 7px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink); }
+.settings { display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+.settings label { display: inline-flex; gap: 5px; align-items: center; white-space: nowrap; }
 .summary-antigens { font-family: var(--mono); font-size: 14px; }
 .flag { color: var(--warn); font-weight: 700; }
 .counts { color: var(--muted); font-size: 13px; }
@@ -93,6 +101,11 @@ details ul { margin: 6px 0 0; padding-left: 18px; }
   <div class="db">
     <span id="dbchip" class="chip">loading…</span>
     <span id="dbmeta"></span>
+    <span class="settings">
+      <label>Updates <select id="updMode" title="auto: switch to new releases automatically · notify: only tell me · off: never check">
+        <option value="auto">auto</option><option value="notify">notify</option><option value="off">off</option></select></label>
+      <label title="Keep using this release until unpinned (recommended after you have checked it)"><input type="checkbox" id="pinBox"> Pin this release</label>
+    </span>
     <button id="updateBtn" type="button" title="Check GitHub for a newer IPD-IMGT/HLA release">Check for update</button>
     <button id="quitBtn" type="button" title="Stop the converter">Quit</button>
   </div>
@@ -103,12 +116,14 @@ details ul { margin: 6px 0 0; padding-left: 18px; }
     <div id="err" class="err" hidden></div>
     <label class="h" for="input">Paste molecular typing</label>
     <p class="hint">Any layout works: a block copied from Excel, a report line, or a list.
-      Two-field, full alleles, G/P groups, XX codes and ambiguity strings (B*15:01/15:03) are understood.</p>
+      Two-field, full alleles, G/P groups, XX codes and ambiguity strings (B*15:01/15:03) are understood.
+      <b>Cross-check:</b> put your current serology after each allele (<code>A*02:01 A2  B*15:03 B72</code>) to compare.</p>
     <textarea id="input" spellcheck="false" placeholder="SYN0001	A*02:01	A*24:02	B*15:01	B*44:02	C*03:04	C*07:01	DRB1*03:01	DRB1*15:01
 Patient 2: A*01:01:01G, A*02:03, B*15:03, B*51:01, DRB1*04:01, DQB1*03:01"></textarea>
     <div class="row">
       <button id="convertBtn" class="primary" type="button">Convert <span class="counts">(Ctrl+Enter)</span></button>
       <button id="exampleBtn" type="button">Load example</button>
+      <button id="checkExampleBtn" type="button">Cross-check example</button>
       <button id="clearBtn" type="button">Clear</button>
       <span class="spacer"></span>
       <span id="counts" class="counts"></span>
@@ -117,6 +132,7 @@ Patient 2: A*01:01:01G, A*02:03, B*15:03, B*51:01, DRB1*04:01, DQB1*03:01"></tex
 
   <section class="panel" id="results" hidden>
     <div class="tabs" role="tablist">
+      <button role="tab" aria-selected="false" data-view="check" id="checkTab" hidden>Cross-check</button>
       <button role="tab" aria-selected="true" data-view="summary">By sample</button>
       <button role="tab" aria-selected="false" data-view="detail">Allele detail</button>
       <span class="spacer"></span>
@@ -128,6 +144,7 @@ Patient 2: A*01:01:01G, A*02:03, B*15:03, B*51:01, DRB1*04:01, DQB1*03:01"></tex
       <span class="spacer"></span>
       <span id="prov" class="counts"></span>
     </div>
+    <div id="checkView" class="table-wrap" hidden></div>
     <div id="summaryView" class="table-wrap"></div>
     <div id="detailView" class="table-wrap" hidden></div>
     <details style="margin-top:12px">
@@ -139,6 +156,9 @@ Patient 2: A*01:01:01G, A*02:03, B*15:03, B*51:01, DRB1*04:01, DQB1*03:01"></tex
         <li><span class="st null">null</span> not expressed (N allele)</li>
         <li><span class="st no-equivalent">no-equivalent</span> WMDA lists no serological antigen</li>
         <li><span class="st not-found">not-found</span> / <span class="st unsupported">unsupported</span> not in this IMGT/HLA release, or an NMDP MAC code</li>
+        <li>Cross-check: <span class="st match">match</span> your serology equals the computed antigen (or its associated antigen) ·
+          <span class="st broad-match">broad-match</span> you entered the broad (e.g. A9 for A24) ·
+          <span class="st mismatch">mismatch</span> review</li>
       </ul>
     </details>
   </section>
@@ -159,6 +179,13 @@ const EXAMPLE = [
   "SYN0004\tA*01:01:01:02N\tA*11:01\tB*35:01\tB*57:01\tC*04:01\tC*06:02\tDRB1*07:01\tDRB1*15:01\tDRB5*01:01\tA*02:AB",
 ].join("\n");
 
+const CHECK_EXAMPLE = [
+  "SYN0101\tA*02:01\tA2\tA*24:02\tA24\tB*15:01\tB62\tB*15:03\tB72\tC*03:04\tCw10\tDRB1*03:01\tDR17",
+  "SYN0102\tA*01:01\tA1\tA*02:03\tA203\tB*15:16\tB63\tB*44:02\tB45\tC*03:03\tCw9\tDRB1*15:01\tDR2",
+  "SYN0103\tA*01:01:01:02N\tnull\tA*68:01\tA28\tB*15:01/15:03\tB62\tB*51:01\tB51\tDQB1*03:01\tDQ7",
+].join("\n");
+let hasCheck = false;
+
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 function toast(msg) {
@@ -178,11 +205,14 @@ function showStatus(s) {
   $("appver").textContent = "v" + s.app_version;
   $("dbchip").textContent = s.release ? "IPD-IMGT/HLA " + s.release : "no data";
   $("dbmeta").textContent = s.release
-    ? `${s.date} · ${s.alleles.toLocaleString()} alleles · auto-update: ${s.pinned ? "pinned " + s.pinned : s.auto_update}`
+    ? `${s.date} · ${s.alleles.toLocaleString()} alleles` + (s.pinned ? " · pinned" : "")
     : "";
   $("err").hidden = !s.error;
   $("err").textContent = s.error ? "Data problem: " + s.error + " — check the internet connection, then press Check for update." : "";
   $("convertBtn").disabled = !s.release;
+  $("updMode").value = s.auto_update;
+  $("pinBox").checked = Boolean(s.pinned);
+  $("pinBox").disabled = !s.release;
 }
 
 async function refreshStatus() { showStatus(await api("/api/status")); }
@@ -219,20 +249,25 @@ function antigenText(r) {
 function render() {
   $("results").hidden = rows.length === 0;
   const counts = rows.reduce((m, r) => (m[r.status] = (m[r.status] || 0) + 1, m), {});
+  const checks = rows.reduce((m, r) => (r.check && (m[r.check] = (m[r.check] || 0) + 1), m), {});
+  hasCheck = Object.keys(checks).length > 0;
   $("counts").textContent = rows.length
     ? `${rows.length} alleles · ` + Object.entries(counts).map(([k, v]) => `${v} ${k}`).join(" · ")
+      + (hasCheck ? "  |  cross-check: " + Object.entries(checks).map(([k, v]) => `${v} ${k}`).join(" · ") : "")
     : "No HLA allele names found.";
+  $("checkTab").hidden = !hasCheck;
   $("prov").textContent = provenance;
 
   let s = `<table><thead><tr><th>Sample</th><th>Serological equivalents</th><th>Broad</th><th>Check</th></tr></thead><tbody>`;
   for (const [sample, rs] of groups()) {
-    const flagged = rs.filter((r) => FLAG.has(r.status));
+    const flagged = rs.filter((r) => FLAG.has(r.status) || r.check === "mismatch" || r.check === "broad-match");
     const ags = rs.map(antigenText).filter(Boolean).join(" ");
     const broads = rs.filter((r) => r.broad).map((r) => r.broad).join(" ");
     s += `<tr><td class="mono">${esc(sample)}</td><td class="summary-antigens">${esc(ags)}</td>
       <td class="mono">${esc(broads)}</td>
       <td>${flagged.length ? `<span class="flag">${flagged.length} to review</span>: ` +
-        flagged.map((r) => esc(r.input) + ` <span class="st ${r.status}">${r.status}</span>`).join(", ") : "—"}</td></tr>`;
+        flagged.map((r) => esc(r.input) + (r.check === "mismatch" || r.check === "broad-match"
+          ? ` <span class="st ${r.check}">${r.check}</span>` : ` <span class="st ${r.status}">${r.status}</span>`)).join(", ") : "—"}</td></tr>`;
   }
   $("summaryView").innerHTML = s + "</tbody></table>";
 
@@ -246,17 +281,28 @@ function render() {
       <td class="note">${esc(r.note)}</td></tr>`;
   }
   $("detailView").innerHTML = d + "</tbody></table>";
-  setView(view);
+
+  let c = `<table><thead><tr><th>Sample</th><th>Input</th><th>Your serology</th><th>Computed</th><th>Broad</th>
+    <th>Check</th><th>Status</th><th>Note</th></tr></thead><tbody>`;
+  for (const r of rows.filter((r) => r.expected)) {
+    c += `<tr class="${r.check === "mismatch" ? "row-mismatch" : ""}"><td class="mono">${esc(r.sample || "line " + r.line)}</td>
+      <td class="mono">${esc(r.input)}</td><td class="eq">${esc(r.expected)}</td><td class="eq">${esc(r.equivalent)}</td>
+      <td class="mono">${esc(r.broad)}</td><td><span class="st ${r.check}">${r.check}</span></td>
+      <td><span class="st ${r.status}">${r.status}</span></td><td class="note">${esc(r.check_note)}</td></tr>`;
+  }
+  $("checkView").innerHTML = c + "</tbody></table>";
+  setView(hasCheck ? "check" : (view === "check" ? "summary" : view));
 }
 
 function setView(v) {
   view = v;
   document.querySelectorAll(".tabs [role=tab]").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === v)));
   $("summaryView").hidden = v !== "summary";
+  $("checkView").hidden = v !== "check";
   $("detailView").hidden = v !== "detail";
 }
 
-const COLS = ["line","sample","input","equivalent","associated","broad","status","basis","hats","resolved_as","note"];
+const COLS = ["line","sample","input","expected","equivalent","check","associated","broad","status","basis","hats","resolved_as","note","check_note"];
 function delimited(sep) {
   const q = (v) => { v = String(v ?? ""); return sep === "," && /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v.replace(/\t/g, " "); };
   return [COLS.join(sep), ...rows.map((r) => COLS.map((c) => q(r[c])).join(sep))].join("\n");
@@ -270,6 +316,13 @@ async function copy(text, what) {
 $("convertBtn").onclick = convert;
 $("input").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) convert(); });
 $("exampleBtn").onclick = () => { $("input").value = EXAMPLE; convert(); };
+$("checkExampleBtn").onclick = () => { $("input").value = CHECK_EXAMPLE; convert(); };
+async function saveSettings(body) {
+  try { showStatus(await api("/api/config", body)); toast("Settings saved"); if (rows.length) convert(); }
+  catch (e) { toast(e.message); }
+}
+$("updMode").onchange = () => saveSettings({ auto_update: $("updMode").value });
+$("pinBox").onchange = () => saveSettings({ pin: $("pinBox").checked });
 $("clearBtn").onclick = () => { $("input").value = ""; rows = []; render(); $("input").focus(); };
 document.querySelectorAll(".tabs [role=tab]").forEach((b) => (b.onclick = () => setView(b.dataset.view)));
 $("copyTable").onclick = () => copy(delimited("\t"), "Table");
