@@ -9,7 +9,9 @@ network traffic is the IMGT/HLA update check to GitHub.
 from __future__ import annotations
 
 import json
+import os
 import socket
+import sys
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -55,6 +57,7 @@ class App:
             "alleles": len(self.db.alleles) if self.db else 0,
             "provenance": provenance(self.db) if self.db else "",
             "auto_update": cfg["auto_update"],
+            "check_interval_days": cfg["check_interval_days"],
             "pinned": cfg.get("pinned_release"),
             "installed": imgt.installed_releases(),
             "error": self.error,
@@ -62,8 +65,29 @@ class App:
         }
 
 
+    def configure(self, data: dict) -> None:
+        cfg = imgt.load_config()
+        if data.get("auto_update") in imgt.AUTO_UPDATE_MODES:
+            cfg["auto_update"] = data["auto_update"]
+        if "pin" in data:
+            cfg["pinned_release"] = self.db.version if (data["pin"] and self.db) else None
+        imgt.save_config(cfg)
+        if "pin" in data and not data["pin"]:
+            self.reload(update=True)              # unpinned: follow the newest release again
+
+
+def _page() -> bytes:
+    """index.html from the package — or from the PyInstaller bundle inside the .exe."""
+    try:
+        return resources.files("hla_sero").joinpath("web/index.html").read_bytes()
+    except (FileNotFoundError, ModuleNotFoundError, OSError):
+        base = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+        with open(os.path.join(base, "hla_sero", "web", "index.html"), "rb") as fh:
+            return fh.read()
+
+
 def make_handler(app: App, port_holder: dict):
-    page = resources.files("hla_sero").joinpath("web/index.html").read_bytes()
+    page = _page()
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *a):          # keep the terminal quiet
@@ -114,6 +138,9 @@ def make_handler(app: App, port_holder: dict):
             if self.path == "/api/update":
                 app.reload(update=True, force=True)
                 return self._json(app.status())
+            if self.path == "/api/config":
+                app.configure(data)
+                return self._json(app.status())
             if self.path == "/api/quit":
                 self._json({"ok": True})
                 threading.Thread(target=self.server.shutdown, daemon=True).start()
@@ -135,10 +162,16 @@ def serve(port: int = 0, open_browser: bool = True, release: str | None = None) 
     holder = {"port": port}
     server = ThreadingHTTPServer(("127.0.0.1", port), make_handler(app, holder))
     url = f"http://127.0.0.1:{port}/"
-    print(f"HLA Serology Converter running at {url}")
-    print("Close it with the Quit button in the window, or Ctrl+C here.")
+    print(f"HLA Serology Converter running at {url}", flush=True)
+    if getattr(sys, "frozen", False):
+        print("Keep this window open while you use the converter.", flush=True)
+        print("To stop: press Quit in the browser window, or close this window.", flush=True)
+    else:
+        print("Close it with the Quit button in the window, or Ctrl+C here.", flush=True)
     if open_browser:
-        threading.Timer(0.4, lambda: webbrowser.open(url)).start()
+        opener = threading.Timer(0.4, lambda: webbrowser.open(url))
+        opener.daemon = True          # never keep the program alive after Quit
+        opener.start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:

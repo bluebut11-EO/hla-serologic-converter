@@ -1,0 +1,105 @@
+# Tests on Linux + Windows, then builds the standalone Windows program.
+#
+#  * every push / pull request : run tests, build hla-sero.exe, keep it as a
+#                                downloadable "artifact" on the run page (30 days)
+#  * pushing a tag like v0.3.0 : also publish a GitHub Release with
+#                                hla-sero.exe + SHA256SUMS.txt
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[dev]"
+      - run: python -m pytest -q
+      - name: Live check against the current IPD-IMGT/HLA release
+        env:
+          HLA_SERO_LIVE: "1"
+        run: python -m pytest -q tests/test_live.py
+
+  windows-exe:
+    name: Build hla-sero.exe
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: python -m pip install . "pyinstaller==6.22.3"
+      - name: Build
+        run: >
+          pyinstaller --onefile --console --clean --name hla-sero
+          --collect-data hla_sero packaging/hla_sero_exe.py
+
+      - name: Smoke test - command line
+        shell: pwsh
+        env:
+          HLA_SERO_HOME: ${{ runner.temp }}\hla-sero-smoke
+        run: |
+          .\dist\hla-sero.exe --version
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $out = "S1 A*02:01 A2 B*15:03 B72 C*03:04 Cw10" | .\dist\hla-sero.exe convert
+          $out
+          if (($out -join "`n") -notmatch "Cross-check: 3 match") { Write-Error "unexpected conversion result"; exit 1 }
+
+      - name: Smoke test - copy-paste window
+        shell: pwsh
+        env:
+          HLA_SERO_HOME: ${{ runner.temp }}\hla-sero-smoke
+        run: |
+          $p = Start-Process -FilePath .\dist\hla-sero.exe -ArgumentList "gui","--no-browser","--port","8799" -PassThru
+          $ok = $false
+          foreach ($i in 1..30) {
+            Start-Sleep -Seconds 1
+            try { $page = (Invoke-WebRequest http://127.0.0.1:8799/ -UseBasicParsing).Content; $ok = $true; break } catch {}
+          }
+          if (-not $ok -or $page -notmatch "HLA Serology Converter") { Stop-Process $p -Force; Write-Error "window did not load"; exit 1 }
+          $body = '{"text":"S1 B*15:01 B62"}'
+          $res = Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8799/api/convert -ContentType "application/json" -Body $body
+          if ($res.rows[0].check -ne "match") { Stop-Process $p -Force; Write-Error "convert API failed"; exit 1 }
+          Invoke-RestMethod -Method Post -Uri http://127.0.0.1:8799/api/quit -ContentType "application/json" -Body "{}" | Out-Null
+          "window OK: $($res.provenance)"
+
+      - name: Checksum
+        shell: pwsh
+        run: |
+          $h = (Get-FileHash dist\hla-sero.exe -Algorithm SHA256).Hash.ToLower()
+          "$h  hla-sero.exe" | Out-File -Encoding ascii dist\SHA256SUMS.txt
+          Get-Content dist\SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: hla-sero-windows
+          path: |
+            dist/hla-sero.exe
+            dist/SHA256SUMS.txt
+          retention-days: 30
+
+      - name: Publish release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            dist/hla-sero.exe
+            dist/SHA256SUMS.txt
+          generate_release_notes: true

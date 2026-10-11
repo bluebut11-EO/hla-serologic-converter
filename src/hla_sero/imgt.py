@@ -45,22 +45,34 @@ class UpdateError(RuntimeError):
 
 # ---------------------------------------------------------------- locations
 
+def _is_windows() -> bool:
+    return os.name == "nt"
+
+
 def _home() -> Path | None:
     h = os.environ.get("HLA_SERO_HOME")
     return Path(h) if h else None
 
 
 def data_dir() -> Path:
+    """Linux: ~/.local/share/hla-sero   Windows: %LOCALAPPDATA%\\hla-sero"""
     if h := _home():
         return h
-    base = os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share"
+    if _is_windows():
+        base = os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local"
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share"
     return Path(base) / "hla-sero"
 
 
 def config_dir() -> Path:
+    """Linux: ~/.config/hla-sero   Windows: %APPDATA%\\hla-sero"""
     if h := _home():
         return h
-    base = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
+    if _is_windows():
+        base = os.environ.get("APPDATA") or Path.home() / "AppData" / "Roaming"
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
     return Path(base) / "hla-sero"
 
 

@@ -1,0 +1,40 @@
+Sample,Allele,Current serology (fill in),Why it is here
+VAL001,A*01:01,,common
+VAL002,A*02:01,,common; 2026 associated antigen A0201
+VAL003,A*02:03,,associated antigen (A203 / A0203)
+VAL004,A*02:10,,associated antigen (A210 / A0210)
+VAL005,A*24:02,,split of A9
+VAL006,A*24:03,,associated antigen of A24
+VAL007,A*68:01,,split of A28
+VAL008,A*69:01,,split of A28
+VAL009,B*07:02,,common
+VAL010,B*15:01,,B15 family -> B62
+VAL011,B*15:02,,B15 family -> B75
+VAL012,B*15:03,,B15 family -> B72 (broad B70)
+VAL013,B*15:10,,B15 family -> B71 (broad B70)
+VAL014,B*15:16,,B15 family -> B63
+VAL015,B*15:12,,B15 family -> B76
+VAL016,B*40:01,,B40 family -> B60
+VAL017,B*40:02,,B40 family -> B61
+VAL018,B*40:05,,B40 family; associated with B21
+VAL019,B*44:02,,split of B12
+VAL020,B*51:01,,split of B5
+VAL021,B*51:02,,associated antigen of B51
+VAL022,C*03:03,,Cw3 family -> Cw9
+VAL023,C*03:04,,Cw3 family -> Cw10
+VAL024,C*03:02,,Cw3 family
+VAL025,DRB1*03:01,,DR17 (broad DR3)
+VAL026,DRB1*03:02,,DR18 (broad DR3)
+VAL027,DRB1*14:01,,DR14 family
+VAL028,DRB1*14:54,,DR14 family
+VAL029,DRB1*15:01,,DR15 (broad DR2)
+VAL030,DRB1*16:01,,DR16 (broad DR2)
+VAL031,DRB3*01:01,,DR52
+VAL032,DRB4*01:01,,DR53
+VAL033,DRB5*01:01,,DR51
+VAL034,DQB1*03:01,,DQ7 (broad DQ3)
+VAL035,DQB1*03:02,,DQ8 (broad DQ3)
+VAL036,DQB1*06:02,,DQ6 (broad DQ1)
+VAL037,A*01:01:01:02N,,null allele -> enter: null
+VAL038,A*02:01:01G,,G group
+VAL039,B*15:01/15:03,,ambiguity string

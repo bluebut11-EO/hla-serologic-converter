@@ -19,6 +19,13 @@ SYN0001  A*02:01  A*24:02  B*15:01  B*15:03  C*03:04  DRB1*03:01
 > traffic is the IMGT/HLA update check to GitHub. A tool for checking typing
 > data — results need review before clinical use.
 
+## Windows (lab PCs) — no installation
+
+Download **`hla-sero.exe`** from the [Releases](../../releases) page and double-click it.
+No Python, no admin rights. Built and smoke-tested on Windows by GitHub Actions;
+every release lists its SHA256.
+Lab guide in Korean: [`docs/LAB_WINDOWS_KO.md`](docs/LAB_WINDOWS_KO.md)
+
 ## Install (Linux Mint / Ubuntu)
 
 ```bash
@@ -44,6 +51,15 @@ Step-by-step guide in Korean: [`docs/SETUP_LINUX_MINT_KO.md`](docs/SETUP_LINUX_M
 | `hla-sero config --pin 3.64.0` / `--unpin` | lock to a validated release / follow latest |
 | `hla-sero config --auto-update notify` | `auto` (default), `notify`, or `off` |
 
+## Cross-check against your current serology
+
+Put the serology you already use after each allele — in Excel columns
+(`Sample | Allele | Serology`) or inline (`A*02:01 A2  B*15:03 B72`) — and each row is
+marked **match**, **broad-match** (you entered the broad, e.g. A9 for A24) or
+**mismatch**. Legacy associated names such as `A203` match the 2026 names (`A0203`).
+In delimited data only the cell right after the allele is read, so comment columns are
+safe. A worksheet of difficult alleles to fill in: [`docs/cross_check_template.csv`](docs/cross_check_template.csv)
+
 ## Where the answers come from
 
 Four WMDA files published with every IMGT/HLA release:
@@ -66,7 +82,8 @@ Rules:
 
 ### Updates
 
-Each release lives in its own folder (`~/.local/share/hla-sero/releases/3.65.0/`)
+Each release lives in its own folder (`~/.local/share/hla-sero/releases/3.65.0/`;
+on Windows `%LOCALAPPDATA%\hla-sero\releases\`)
 and is never overwritten. Downloads are verified against IMGT/HLA's published
 md5 checksums. In `auto` mode the app checks GitHub at most once a week and
 switches to a newer release; older releases stay installed so you can pin one.
@@ -81,6 +98,17 @@ allele,equivalent,associated,broad,note
 A*02:03,A203,,A2,UNOS listing
 ```
 
+## Building the Windows program
+
+`.github/workflows/build.yml` runs the tests on Linux and Windows (plus a live check
+against the current IMGT/HLA release), builds `hla-sero.exe` with PyInstaller and
+smoke-tests it. Every run keeps the exe as a downloadable artifact; pushing a tag
+publishes a release:
+
+```bash
+git tag v0.3.0 && git push origin v0.3.0
+```
+
 ## Development
 
 ```bash
@@ -92,10 +120,12 @@ HLA_SERO_LIVE=1 .venv/bin/python -m pytest tests/test_live.py   # check the real
 src/hla_sero/
   wmda.py      parse the WMDA files
   engine.py    allele -> serology rules, text extraction
+  crosscheck.py  compare with the lab's existing serology
   imgt.py      download, checksum, cache, update policy
   cli.py       hla-sero command
   gui.py       local copy-paste server (127.0.0.1 only)
   web/index.html
+packaging/     entry point for the Windows exe
 tests/         offline tests (fixtures + fake GitHub) and an optional live test
 ```
 

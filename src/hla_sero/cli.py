@@ -10,21 +10,29 @@ hla-sero — molecular HLA typing -> serological equivalents (IPD-IMGT/HLA WMDA 
   hla-sero config --auto-update auto|notify|off   [--pin 3.65.0 | --unpin]
   hla-sero install-launcher        add "HLA Serology Converter" to the Mint menu
   hla-sero demo                    print synthetic typing to try things out
+
+Cross-check: put your lab's serology after each allele (A*02:01 A2  B*15:03 B72)
+and every row is marked match / broad-match / mismatch.
+
+Windows: double-clicking hla-sero.exe opens the copy-paste window.
 """
 
 from __future__ import annotations
 
 import argparse
 import csv
+import os
 import shutil
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from . import __version__, imgt
+from .crosscheck import summary as check_summary
 from .engine import convert_text
 
-COLUMNS = ["line", "sample", "input", "equivalent", "associated", "broad",
-           "status", "basis", "hats", "resolved_as", "note"]
+COLUMNS = ["line", "sample", "input", "expected", "equivalent", "check", "associated", "broad",
+           "status", "basis", "hats", "resolved_as", "note", "check_note"]
 
 
 def load_overrides() -> dict[str, dict]:
@@ -43,7 +51,9 @@ def provenance(db) -> str:
 
 
 def _print_table(rows: list[dict], db) -> None:
-    cols = ["sample", "input", "equivalent", "broad", "associated", "status", "basis"]
+    has_expected = any(r["expected"] for r in rows)
+    cols = (["sample", "input", "expected", "equivalent", "check", "broad", "status"] if has_expected
+            else ["sample", "input", "equivalent", "broad", "associated", "status", "basis"])
     width = {c: max([len(c)] + [len(str(r[c])) for r in rows]) for c in cols}
     width = {c: min(w, 28) for c, w in width.items()}
     fmt = "  ".join(f"{{{c}:<{width[c]}.{width[c]}}}" for c in cols)
@@ -51,15 +61,20 @@ def _print_table(rows: list[dict], db) -> None:
     print(fmt.format(**{c: c.upper() for c in cols}))
     for r in rows:
         print(fmt.format(**{c: str(r[c]) for c in cols}))
-    notes = [(r["input"], r["note"]) for r in rows if r["note"]]
+    notes = [(r["input"], "; ".join(filter(None, [r["check_note"], r["note"]])))
+             for r in rows if r["note"] or r["check_note"]]
     if notes:
         print("\nNotes:")
         for token, note in notes:
             print(f"  {token}: {note}")
+    if has_expected:
+        counts = check_summary(rows)
+        print("\nCross-check: " + ", ".join(f"{n} {k}" for k, n in sorted(counts.items())))
 
 
 def write_rows(rows: list[dict], db, out, delimiter: str = ",") -> None:
-    out.write(f"# {provenance(db)}\n")
+    out.write(f"# {provenance(db)}; hla-sero {__version__}; "
+              f"generated {datetime.now().isoformat(timespec='seconds')}\n")
     w = csv.DictWriter(out, fieldnames=COLUMNS, delimiter=delimiter, extrasaction="ignore")
     w.writeheader()
     w.writerows(rows)
@@ -135,6 +150,10 @@ def cmd_gui(args) -> int:
 
 
 def cmd_install_launcher(_args) -> int:
+    if os.name == "nt":
+        print("On Windows, keep hla-sero.exe in a fixed folder (e.g. Documents\\hla-sero),\n"
+              "then right-click it -> 'Pin to Start' or 'Send to -> Desktop (create shortcut)'.")
+        return 0
     exe = shutil.which("hla-sero") or f"{sys.executable} -m hla_sero"
     apps = Path.home() / ".local" / "share" / "applications"
     apps.mkdir(parents=True, exist_ok=True)
@@ -200,7 +219,19 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _is_frozen() -> bool:
+    return bool(getattr(sys, "frozen", False))
+
+
 def main(argv: list[str] | None = None) -> int:
+    for stream in (sys.stdout, sys.stderr):          # Windows consoles are not always UTF-8
+        try:
+            stream.reconfigure(errors="replace")
+        except (AttributeError, ValueError):
+            pass
+    argv = sys.argv[1:] if argv is None else argv
+    if not argv and _is_frozen():                    # double-clicked hla-sero.exe
+        argv = ["gui"]
     args = build_parser().parse_args(argv)
     if not getattr(args, "func", None):
         build_parser().print_help()
