@@ -1,4 +1,10 @@
-"""Shared fixtures: small WMDA-format files and a fake GitHub — no network needed."""
+"""Shared fixtures: small WMDA-format files and a fake GitHub — no network needed.
+
+The REL_DNA_SER / REL_SER_SER / HLA_NOM_* strings below are SYNTHETIC TEST DATA in the
+WMDA file layout. They are not IPD-IMGT/HLA data: entries were chosen and altered for
+testing (e.g. B*15:99 and the A*02:129x lines are invented). The real data is downloaded
+by users from https://github.com/ANHIG/IMGTHLA under its own licence (CC BY-ND).
+"""
 
 from __future__ import annotations
 
