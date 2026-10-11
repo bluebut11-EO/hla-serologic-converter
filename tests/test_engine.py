@@ -102,3 +102,27 @@ def test_extract_tokens_from_messy_paste():
 def test_convert_text_rows(db):
     rows = convert_text(db, "S1\tA*02:01\tB*15:03")
     assert [(r["sample"], r["equivalent"]) for r in rows] == [("S1", "A2"), ("S1", "B72")]
+
+
+def test_unsuffixed_name_finds_suffixed_allele(db):
+    r = convert(db, "A*01:01:01:02")       # the allele exists only as ...02N
+    assert r.status == "null"
+
+
+def test_four_digit_fields_are_read_whole(db):
+    # A*02:1294 must never be read as A*02:129 (a different allele)
+    toks = [t for _l, _s, t in extract_tokens("S1 A*02:1294 B*07:02 DPB1*1000:01")]
+    assert toks == ["A*02:1294", "B*07:02", "DPB1*1000:01"]
+    assert convert(db, "A*02:1294").resolved_as == "exact allele"
+    assert convert(db, "DPB1*1000:01").status == "no-equivalent"
+
+
+def test_malformed_name_is_shown_not_truncated(db):
+    rows = convert_text(db, "S1 A*02:12945 A*02:01")
+    assert [(r["input"], r["status"]) for r in rows] == [("A*02:12945", "unparseable"), ("A*02:01", "mapped")]
+
+
+def test_glued_prefix_is_kept_whole_and_reported(db):
+    # never silently drop the "X" and convert it as A*02:01
+    rows = convert_text(db, "XA*02:01 A*24:02")
+    assert [(r["input"], r["status"]) for r in rows] == [("XA*02:01", "not-found"), ("A*24:02", "mapped")]
