@@ -3,9 +3,12 @@ __pycache__/
 .pytest_cache/
 .venv/
 venv/
+build/
+dist/
+*.egg-info/
 .env
 .DS_Store
-.ipynb_checkpoints/
-# never commit real or potentially-identifiable data
-data/synthetic/*_converted.csv
+# never commit real or potentially-identifiable typing data
 *.real.csv
+*.real.txt
+output/

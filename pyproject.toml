@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hla-serologic-converter"
+version = "0.2.0"
+description = "Molecular HLA typing -> serological equivalents, using live IPD-IMGT/HLA WMDA data"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = []                      # standard library only
+authors = [{ name = "EunSang" }]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+  "Operating System :: POSIX :: Linux",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
+[project.scripts]
+hla-sero = "hla_sero.cli:main"
+
+[project.urls]
+Source = "https://github.com/bluebut11-EO/hla-serologic-converter"
+"IMGT/HLA data" = "https://github.com/ANHIG/IMGTHLA"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+hla_sero = ["web/*.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["live: downloads real IMGT/HLA data from GitHub (run with HLA_SERO_LIVE=1)"]

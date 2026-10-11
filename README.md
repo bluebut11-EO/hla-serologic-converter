@@ -1,120 +1,103 @@
-# HLA Molecular → Serologic Equivalent Converter
+# HLA Serologic Converter (`hla-sero`)
 
-A small, readable tool that converts molecular HLA typing (IMGT/HLA allele
-format, e.g. `A*24:02`) into UNOS **serologic** antigen equivalents
-(e.g. `A24`, broad `A9`). This is the **logic layer** between molecular typing
-and the serologic vocabulary a **virtual crossmatch (vXM)** is expressed in.
+Converts molecular HLA typing into serological equivalents using the
+**current IPD-IMGT/HLA release**, downloaded straight from the official
+[ANHIG/IMGTHLA](https://github.com/ANHIG/IMGTHLA) repository and kept up to date
+automatically.
 
-> ⚠️ **Synthetic data only.** Everything here uses fake, generated typings.
-> No PHI, ever. The synthetic generator never touches real records.
-
-> ⚠️ **The reference table is an illustrative SUBSET, not production-ready.**
-> It maps at the allele-*family* level as a teaching simplification. The
-> authoritative source is IMGT/HLA's `rel_dna_ser.txt`, which assigns serology
-> per *allele* (some alleles in a family differ, or have null/expert
-> assignments). Swapping that file in is the first "graduation" TODO.
-
-## Why this project
-
-It sits exactly on the seam between domain expertise and code: only someone who
-knows HLA can tell whether the output is *correct*, and the computational parts
-(parsing, normalization, table joins, tests) are the skills being built. Good
-for both an internal lab transition and an external bioinformatics-scientist
-move — and it scales up into a master's capstone.
-
-## Structure
+Paste typing in any layout — a block copied from Excel, a report line, a list —
+and get the antigen, broad and associated antigen for every allele, with a
+per-sample summary ready to copy.
 
 ```
-hla-serologic-converter/
-├── README.md
-├── requirements.txt
-├── .gitignore
-├── data/
-│   ├── reference/serologic_equivalents.csv   # the mapping table (subset)
-│   └── synthetic/                            # generated fake typings land here
-├── src/
-│   ├── converter.py          # core: normalize allele + lookup (stdlib only)
-│   ├── generate_synthetic.py # make fake donor typings (no PHI)
-│   └── cli.py                # convert a typing CSV (pandas layer)
-└── tests/
-    └── test_converter.py     # runs with or without pytest
+SYN0001  A*02:01  A*24:02  B*15:01  B*15:03  C*03:04  DRB1*03:01
+   ->    A2       A24      B62      B72      Cw10     DR17
+ broad   A2       A9       B15      B70      Cw3      DR3
 ```
 
-## Quickstart
+> Runs locally. Pasted typing never leaves the computer; the only network
+> traffic is the IMGT/HLA update check to GitHub. A tool for checking typing
+> data — results need review before clinical use.
 
-**Linux Mint / Ubuntu (recommended):**
+## Install (Linux Mint / Ubuntu)
 
 ```bash
-chmod +x setup.sh run.sh
-./setup.sh      # one-time: creates .venv, installs deps, runs tests
-./run.sh        # synthetic data -> conversion -> summary
+git clone https://github.com/bluebut11-EO/hla-serologic-converter.git
+cd hla-serologic-converter
+./install.sh
 ```
 
-Full step-by-step guide (Korean), including GitHub SSH setup:
-[`docs/SETUP_LINUX_MINT_KO.md`](docs/SETUP_LINUX_MINT_KO.md)
+This installs the `hla-sero` command (via `pipx`), downloads the latest
+IMGT/HLA release and adds **HLA Serology Converter** to the menu.
 
-**Manual:**
+Step-by-step guide in Korean: [`docs/SETUP_LINUX_MINT_KO.md`](docs/SETUP_LINUX_MINT_KO.md)
+
+## Use
+
+| | |
+|---|---|
+| `hla-sero gui` | copy-paste window in the browser (also in the menu) |
+| `hla-sero convert` | paste in the terminal, finish with Ctrl+D |
+| `hla-sero convert typing.txt -o result.csv` | convert a file |
+| `hla-sero status` | release in use, update settings |
+| `hla-sero update` | check for a new release now |
+| `hla-sero config --pin 3.64.0` / `--unpin` | lock to a validated release / follow latest |
+| `hla-sero config --auto-update notify` | `auto` (default), `notify`, or `off` |
+
+## Where the answers come from
+
+Four WMDA files published with every IMGT/HLA release:
+
+| File | Used for |
+|---|---|
+| `rel_dna_ser.txt` | allele → serological code (unambiguous / possible / assumed / HATS) |
+| `rel_ser_ser.txt` | associated antigen → antigen → broad (e.g. B1501 → B62 → B15) |
+| `hla_nom_g.txt`, `hla_nom_p.txt` | expanding G and P groups |
+
+Rules:
+
+- **mapped** only when serology is characterised (WMDA unambiguous/possible).
+- **assumed** when WMDA only infers it from the allele name — always flagged.
+- **ambiguous** when the alleles a typing covers map to different antigens
+  (e.g. `B*15` or `B*15:01/15:03`) — every candidate is listed, none is chosen.
+- Two-field, G/P and XX typings exclude null/questionable (N/Q) members; the
+  count is shown. An explicit null allele is reported as **null**.
+- Every result carries the release it came from.
+
+### Updates
+
+Each release lives in its own folder (`~/.local/share/hla-sero/releases/3.65.0/`)
+and is never overwritten. Downloads are verified against IMGT/HLA's published
+md5 checksums. In `auto` mode the app checks GitHub at most once a week and
+switches to a newer release; older releases stay installed so you can pin one.
+
+### Lab policy overrides (optional)
+
+Where your lab or a registry (e.g. OPTN/UNOS equivalency tables) differs from
+WMDA, put exceptions in `~/.config/hla-sero/overrides.csv`:
+
+```
+allele,equivalent,associated,broad,note
+A*02:03,A203,,A2,UNOS listing
+```
+
+## Development
 
 ```bash
-# 1. (optional) virtual env
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-# 2. run the tests
-python -m tests.test_converter        # no pytest needed
-# pytest                              # also works if installed
-
-# 3. generate synthetic typings, then convert them
-python -m src.generate_synthetic -n 20
-python -m src.cli
-
-# 4. convert a single allele
-python -m src.cli --allele "DRB1*15:01"
-# -> DRB1*15:01 -> DR15 (broad DR2)
+./setup.sh                                            # .venv + editable install + tests
+HLA_SERO_LIVE=1 .venv/bin/python -m pytest tests/test_live.py   # check the real release
 ```
 
-## 2-week learning roadmap
+```
+src/hla_sero/
+  wmda.py      parse the WMDA files
+  engine.py    allele -> serology rules, text extraction
+  imgt.py      download, checksum, cache, update policy
+  cli.py       hla-sero command
+  gui.py       local copy-paste server (127.0.0.1 only)
+  web/index.html
+tests/         offline tests (fixtures + fake GitHub) and an optional live test
+```
 
-Built for ~30 min on weekdays + a longer weekend block. Each task maps to a
-real piece of this repo, so you learn by extending working code rather than
-reading tutorials.
-
-### Week 1 — computing foundations on familiar ground
-- **Day 1 — Git + run it.** Init a repo, make your first commit, push to a
-  private GitHub repo. Run the tests; read `converter.py` top to bottom.
-- **Day 2 — Read the parser.** Study `normalize_allele`. Add one test case for
-  an allele with an expression suffix (e.g. `A*24:09N`). Watch it pass.
-- **Day 3 — Break it on purpose.** Feed the converter a malformed allele from a
-  real edge case you've seen at the bench. Make the parser handle it; commit.
-- **Day 4 — Command line.** From a terminal: `grep`, `wc -l`, and a pipe to
-  count how many `unmapped` cells appear in `sample_converted.csv`.
-- **Weekend — Extend the reference table.** Add 5–10 allele families you know
-  cold (with correct split/broad). Add matching tests. This is the part where
-  your domain knowledge writes the code.
-
-### Week 2 — the bioinformatics + pandas layer
-- **Day 5 — pandas basics.** In `cli.py`, read the synthetic CSV into a
-  DataFrame; print value counts of `_status` columns.
-- **Day 6 — Reshape.** Convert the wide table to long format
-  (`sample_id, locus, allele`) with `pd.melt`; re-run the conversion on it.
-- **Day 7 — A real format.** Learn the VCF spec at a glance; write a 10-line
-  function that reads the sample IDs out of a tiny VCF header. (You don't need
-  the whole file yet — just see the format.)
-- **Day 8 — Reproducibility.** Add a `make`-style script (or a `run.sh`) that
-  regenerates data → converts → tests in one command. This "one command
-  reproduces everything" habit is a strong clinical-lab signal.
-- **Weekend — Swap in real reference data.** Download IMGT/HLA `rel_dna_ser.txt`,
-  re-key the table from family to full allele, and handle the null/expert flags.
-  This is the leap from toy to credible.
-
-## Authoritative data sources (for the graduation step)
-- **IMGT/HLA** `rel_dna_ser.txt` — allele-level serologic assignments.
-- **NMDP / WMDA `py-ard`** — Python library for ARD reduction and resolution
-  conversion; the natural next dependency.
-- **UNOS / OPTN** antigen equivalency tables — the serologic vocabulary used in
-  allocation and unacceptable-antigen listing.
-
-## Roadmap beyond the basics
-- Replace family-level table with allele-level `rel_dna_ser` (+ `py-ard`).
-- Take a recipient unacceptable-antigen list + a donor typing → vXM call.
-- Thin web UI (you already have the Netlify/single-file skill) to demo it.
+Data: IPD-IMGT/HLA Database, https://www.ebi.ac.uk/ipd/imgt/hla/ — please cite
+Barker DJ et al., *Nucleic Acids Research* (2023) and the WMDA files' README.
