@@ -29,9 +29,13 @@ _ALLELE_RE = re.compile(
     r"^(?:HLA-)?"
     r"(?P<locus>[A-Z]+[0-9]*)\*"
     r"(?P<first>\d+)"
+    r"(?::(?P<second>\d+))?"   # second field, e.g. the "01" in B*15:01
     r"(?::\d+)*"
     r"(?P<suffix>[A-Z])?$"
 )
+
+# Allele-level exceptions live next to the family table and are checked first.
+OVERRIDES_FILENAME = "allele_overrides.csv"
 
 
 @dataclass
@@ -42,10 +46,12 @@ class ConversionResult:
     serologic_split: str | None = None
     serologic_broad: str | None = None
     status: str = "unparseable"  # unparseable | unmapped | mapped
+    level: str | None = None     # which table answered: "allele" | "family"
 
     def __str__(self) -> str:
         if self.status == "mapped":
-            return f"{self.raw} -> {self.serologic_split} (broad {self.serologic_broad})"
+            return (f"{self.raw} -> {self.serologic_split} "
+                    f"(broad {self.serologic_broad}, {self.level}-level)")
         return f"{self.raw} -> [{self.status}]"
 
 
@@ -57,6 +63,15 @@ def normalize_allele(raw: str) -> tuple[str, str] | None:
     >>> normalize_allele("DRB1*15:01")
     ('DRB1', '15')
     >>> normalize_allele("nonsense")
+    """
+    parsed = parse_allele(raw)
+    return None if parsed is None else (parsed[0], parsed[1])
+
+
+def parse_allele(raw: str) -> tuple[str, str, str | None] | None:
+    """Return (locus, family, two_field) e.g. ('B', '15', '15:01').
+
+    two_field is None when only one field was given (e.g. "A*02").
     """
     if raw is None:
         return None
@@ -72,39 +87,61 @@ def normalize_allele(raw: str) -> tuple[str, str] | None:
     locus = m.group("locus")
     # zero-pad single-digit families so "A*2" and "A*02" both key as "02"
     family = m.group("first").zfill(2)
-    return locus, family
+    second = m.group("second")
+    two_field = f"{family}:{second}" if second else None
+    return locus, family, two_field
 
 
-def load_reference(path: str | Path) -> dict[tuple[str, str], dict[str, str]]:
-    """Load the serologic equivalence table into {(locus, family): {...}}."""
+def _read_table(path: Path, key_column: str) -> dict[tuple[str, str], dict[str, str]]:
     table: dict[tuple[str, str], dict[str, str]] = {}
     with open(path, newline="", encoding="utf-8") as fh:
         for row in csv.DictReader((ln for ln in fh if not ln.startswith("#"))):
-            key = (row["locus"], row["family"])
-            table[key] = {
+            table[(row["locus"], row[key_column])] = {
                 "serologic_split": row["serologic_split"],
                 "serologic_broad": row["serologic_broad"],
             }
     return table
 
 
+def load_reference(path: str | Path) -> dict[tuple[str, str], dict[str, str]]:
+    """Load the family table, plus allele_overrides.csv from the same folder.
+
+    Keys look like ("A", "24") for families and ("B", "15:01") for alleles,
+    so both kinds can live in one dict without colliding.
+    """
+    path = Path(path)
+    table = _read_table(path, "family")
+    overrides = path.parent / OVERRIDES_FILENAME
+    if overrides.exists():
+        table.update(_read_table(overrides, "allele"))
+    return table
+
+
 def to_serologic(raw: str, reference: dict[tuple[str, str], dict[str, str]]) -> ConversionResult:
-    """Convert one molecular allele string to its serologic equivalent."""
-    parsed = normalize_allele(raw)
+    """Convert one molecular allele string to its serologic equivalent.
+
+    Lookup order: allele-level (two-field) first, then family-level.
+    A family with no family-level row (like B*15) stays "unmapped" when the
+    specific allele isn't listed — an honest "unknown" beats a wrong answer.
+    """
+    parsed = parse_allele(raw)
     if parsed is None:
         return ConversionResult(raw=raw, status="unparseable")
-    locus, family = parsed
-    entry = reference.get((locus, family))
-    if entry is None:
-        return ConversionResult(raw=raw, locus=locus, family=family, status="unmapped")
-    return ConversionResult(
-        raw=raw,
-        locus=locus,
-        family=family,
-        serologic_split=entry["serologic_split"],
-        serologic_broad=entry["serologic_broad"],
-        status="mapped",
-    )
+    locus, family, two_field = parsed
+
+    for key, level in (((locus, two_field), "allele"), ((locus, family), "family")):
+        entry = reference.get(key) if key[1] else None
+        if entry is not None:
+            return ConversionResult(
+                raw=raw,
+                locus=locus,
+                family=family,
+                serologic_split=entry["serologic_split"],
+                serologic_broad=entry["serologic_broad"],
+                status="mapped",
+                level=level,
+            )
+    return ConversionResult(raw=raw, locus=locus, family=family, status="unmapped")
 
 
 if __name__ == "__main__":

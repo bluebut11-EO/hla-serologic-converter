@@ -51,6 +51,19 @@ def test_dr9_dr10():
     assert to_serologic("DRB1*09:01", REF).serologic_split == "DR9"
     assert to_serologic("DRB1*10:01", REF).serologic_split == "DR10"
 
+def test_b15_splits_at_allele_level():
+    # Same B*15 family, different serology -> family-level lookup can't tell them apart
+    assert to_serologic("B*15:01", REF).serologic_split == "B62"
+    assert to_serologic("B*15:02", REF).serologic_split == "B75"
+    assert to_serologic("B*15:16", REF).serologic_split == "B63"
+    r = to_serologic("B*15:03", REF)
+    assert r.serologic_split == "B72" and r.serologic_broad == "B70"
+
+
+def test_b15_unknown_allele_is_not_guessed():
+    # A B*15 allele not in the override table must stay unmapped, never guessed
+    assert to_serologic("B*15:99", REF).status == "unmapped"
+
 def _run_all():
     tests = [v for k, v in globals().items() if k.startswith("test_") and callable(v)]
     passed = 0
